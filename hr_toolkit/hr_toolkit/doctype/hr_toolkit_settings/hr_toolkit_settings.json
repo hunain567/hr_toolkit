@@ -1,0 +1,45 @@
+{
+ "actions": [],
+ "creation": "2026-09-25 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_salary",
+  "working_days",
+  "show_fixed_days_on_slip",
+  "section_absent",
+  "exclude_holidays",
+  "column_break_absent",
+  "count_half_day",
+  "half_day_value",
+  "section_joining",
+  "deduct_before_joining"
+ ],
+ "fields": [
+  {"fieldname": "section_salary", "fieldtype": "Section Break", "label": "Per Day Salary"},
+  {"fieldname": "working_days", "fieldtype": "Int", "label": "Working Days per Month", "default": "26", "reqd": 1,
+   "description": "Per day salary = Salary \u00f7 Working Days. Mahina 28, 29, 30 ya 31 din ka ho, ye fix rehta hai."},
+  {"fieldname": "show_fixed_days_on_slip", "fieldtype": "Check", "label": "Slip par Working Days / Payment Days isi hisaab se dikhao", "default": "1"},
+  {"fieldname": "section_absent", "fieldtype": "Section Break", "label": "Absent Rules"},
+  {"fieldname": "exclude_holidays", "fieldtype": "Check", "label": "Sunday / Holiday wali Absent na gino", "default": "1"},
+  {"fieldname": "column_break_absent", "fieldtype": "Column Break"},
+  {"fieldname": "count_half_day", "fieldtype": "Check", "label": "Half Day ko deduction mein gino", "default": "0"},
+  {"fieldname": "half_day_value", "fieldtype": "Float", "label": "Half Day = kitne din", "default": "0.5", "depends_on": "eval:doc.count_half_day"},
+  {"fieldname": "section_joining", "fieldtype": "Section Break", "label": "Joining / Leaving"},
+  {"fieldname": "deduct_before_joining", "fieldtype": "Check", "label": "Join se pehle aur chhorne ke baad ke working days kaato", "default": "0",
+   "description": "Mahine ke beech join ya left karne wale employee ki un dinon ki salary kategi (holidays chhor ke)."}
+ ],
+ "issingle": 1,
+ "modified": "2026-09-25 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HR Toolkit",
+ "name": "HR Toolkit Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "read": 1, "write": 1, "role": "System Manager"},
+  {"create": 1, "read": 1, "write": 1, "role": "HR Manager"}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

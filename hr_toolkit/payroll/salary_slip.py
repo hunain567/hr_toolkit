@@ -1,31 +1,80 @@
 import frappe
-from frappe.utils import getdate
+from frappe.utils import add_days, cint, flt, getdate
 
 
-def set_full_absent_days(doc, method=None):
-    """Salary Slip save hone se pehle: sirf full day Absent gino, holidays nikaal ke."""
+def get_settings():
+    s = frappe.get_cached_doc("HR Toolkit Settings")
+    return frappe._dict(
+        working_days=cint(s.working_days) or 26,
+        show_fixed_days_on_slip=cint(s.show_fixed_days_on_slip),
+        exclude_holidays=cint(s.exclude_holidays),
+        count_half_day=cint(s.count_half_day),
+        half_day_value=flt(s.half_day_value) or 0.5,
+        deduct_before_joining=cint(s.deduct_before_joining),
+    )
+
+
+def get_holidays(employee, start, end):
+    try:
+        from hrms.hr.utils import get_holiday_dates_for_employee
+        return {getdate(d) for d in get_holiday_dates_for_employee(employee, start, end)}
+    except Exception:
+        return set()
+
+
+def calculate_deduction_days(doc, method=None):
+    """before_validate: settings ke hisaab se Full Day Absents aur Deduction Days bharo."""
     if not (doc.employee and doc.start_date and doc.end_date):
         return
 
-    absent_dates = frappe.get_all(
+    s = get_settings()
+    start, end = getdate(doc.start_date), getdate(doc.end_date)
+    holidays = get_holidays(doc.employee, start, end)
+
+    rows = frappe.get_all(
         "Attendance",
         filters={
             "employee": doc.employee,
             "docstatus": 1,
-            "status": "Absent",
-            "attendance_date": ["between", [doc.start_date, doc.end_date]],
+            "status": ["in", ["Absent", "Half Day"]],
+            "attendance_date": ["between", [start, end]],
         },
-        pluck="attendance_date",
+        fields=["attendance_date", "status"],
     )
 
-    holidays = set()
-    try:
-        from hrms.hr.utils import get_holiday_dates_for_employee
-        holidays = {
-            getdate(d)
-            for d in get_holiday_dates_for_employee(doc.employee, doc.start_date, doc.end_date)
-        }
-    except Exception:
-        pass
+    full, half = 0, 0
+    for r in rows:
+        if s.exclude_holidays and getdate(r.attendance_date) in holidays:
+            continue
+        if r.status == "Absent":
+            full += 1
+        else:
+            half += 1
 
-    doc.full_absent_days = len([d for d in absent_dates if getdate(d) not in holidays])
+    outside = 0
+    if s.deduct_before_joining:
+        joining, relieving = frappe.db.get_value(
+            "Employee", doc.employee, ["date_of_joining", "relieving_date"]
+        )
+        joining = getdate(joining) if joining else None
+        relieving = getdate(relieving) if relieving else None
+        d = start
+        while d <= end:
+            if d not in holidays and ((joining and d < joining) or (relieving and d > relieving)):
+                outside += 1
+            d = getdate(add_days(d, 1))
+
+    deduct = full + outside + (half * s.half_day_value if s.count_half_day else 0)
+
+    doc.full_absent_days = full
+    doc.fixed_working_days = s.working_days
+    doc.deduct_days = min(deduct, s.working_days)
+
+
+def set_fixed_payment_days(doc, method=None):
+    """validate: ERPNext ke calculation ke baad Working Days / Payment Days settings se."""
+    s = get_settings()
+    if not s.show_fixed_days_on_slip:
+        return
+    doc.total_working_days = s.working_days
+    doc.payment_days = s.working_days - flt(doc.deduct_days)

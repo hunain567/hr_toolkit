@@ -250,9 +250,11 @@ app_license = "mit"
 
 required_apps = ["hrms"]
 after_install = "hr_toolkit.install.after_install"
+after_migrate = "hr_toolkit.install.after_migrate"
 
 doc_events = {
     "Salary Slip": {
-        "before_validate": "hr_toolkit.payroll.salary_slip.set_full_absent_days",
+        "before_validate": "hr_toolkit.payroll.salary_slip.calculate_deduction_days",
+        "validate": "hr_toolkit.payroll.salary_slip.set_fixed_payment_days",
     }
 }
