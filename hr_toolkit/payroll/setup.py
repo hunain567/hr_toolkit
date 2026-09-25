@@ -1,5 +1,3 @@
-import copy
-
 import frappe
 from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
@@ -10,11 +8,21 @@ ABSENT_FORMULA = "round(base / fixed_working_days * deduct_days) if fixed_workin
 
 COMPONENTS = [
     {
+        "name": "Monthly Salary",
+        "abbr": "MS",
+        "type": "Earning",
+        "formula": "base",
+        "remove_if_zero": 0,
+        "do_not_include_in_total": 1,
+        "description": "Salary as per Salary Structure Assignment. Display only, not included in totals.",
+    },
+    {
         "name": "Basic",
         "abbr": "B",
         "type": "Earning",
         "formula": "base",
         "remove_if_zero": 0,
+        "do_not_include_in_total": 0,
         "description": "Full monthly salary. Not prorated by month length.",
     },
     {
@@ -23,6 +31,7 @@ COMPONENTS = [
         "type": "Deduction",
         "formula": ABSENT_FORMULA,
         "remove_if_zero": 1,
+        "do_not_include_in_total": 0,
         "description": "Per day salary (Salary / Working Days from HR Toolkit Settings) x Deduction Days.",
     },
 ]
@@ -83,32 +92,8 @@ DEFAULT_SETTINGS = {
 }
 
 
-def get_field_before(doctype, fieldname, skip=()):
-    """Return the fieldname placed just before `fieldname` on the form."""
-    fields = [df.fieldname for df in frappe.get_meta(doctype).fields if df.fieldname not in skip]
-    if fieldname in fields:
-        i = fields.index(fieldname)
-        if i > 0:
-            return fields[i - 1]
-    return None
-
-
 def setup_custom_fields():
-    fields = copy.deepcopy(CUSTOM_FIELDS)
-    fields["Salary Slip"].append(
-        {
-            "fieldname": "hrt_monthly_salary",
-            "label": "Monthly Salary",
-            "fieldtype": "Currency",
-            "options": "currency",
-            "insert_after": get_field_before("Salary Slip", "earnings", skip=("hrt_monthly_salary",))
-            or "salary_structure",
-            "read_only": 1,
-            "bold": 1,
-            "description": "Salary as per Salary Structure Assignment",
-        }
-    )
-    create_custom_fields(fields, update=True)
+    create_custom_fields(CUSTOM_FIELDS, update=True)
 
 
 def setup_settings():
@@ -154,6 +139,7 @@ def setup_salary_components():
         doc.amount_based_on_formula = 1
         doc.formula = c["formula"]
         doc.remove_if_zero_valued = c["remove_if_zero"]
+        doc.do_not_include_in_total = c["do_not_include_in_total"]
         doc.description = c["description"]
         doc.disabled = 0
         doc.flags.ignore_permissions = True
@@ -161,37 +147,34 @@ def setup_salary_components():
 
 
 def update_structure_formulas():
-    """Update formulas only in structures created by this app ('Standard Salary - XX')."""
-    for c in COMPONENTS:
-        frappe.db.sql(
-            """update `tabSalary Detail`
-               set formula = %s, amount_based_on_formula = 1, depends_on_payment_days = 0
-               where parenttype = 'Salary Structure'
-                 and parent like 'Standard Salary - %%'
-                 and salary_component = %s""",
-            (c["formula"], c["name"]),
-        )
-
-
-def backfill_monthly_salary():
-    """Fill Monthly Salary on existing (draft and submitted) salary slips."""
-    from hr_toolkit.payroll.salary_slip import get_monthly_salary
-
-    slips = frappe.get_all(
-        "Salary Slip",
-        filters={"docstatus": ["<", 2]},
-        fields=["name", "employee", "salary_structure", "end_date"],
+    """Sync app components into structures created by this app ('Standard Salary - XX').
+    Updates existing rows and adds missing ones."""
+    structures = frappe.get_all(
+        "Salary Structure", filters={"name": ["like", "Standard Salary - %"]}, pluck="name"
     )
-    for s in slips:
-        frappe.db.set_value(
-            "Salary Slip",
-            s.name,
-            "hrt_monthly_salary",
-            get_monthly_salary(s.employee, s.salary_structure, s.end_date),
-            update_modified=False,
-        )
-    frappe.db.commit()
-    print(f"Monthly Salary updated on {len(slips)} salary slip(s).")
+    for name in structures:
+        ss = frappe.get_doc("Salary Structure", name)
+        for c in COMPONENTS:
+            table = "earnings" if c["type"] == "Earning" else "deductions"
+            row = next((r for r in ss.get(table) if r.salary_component == c["name"]), None)
+            if row:
+                frappe.db.set_value("Salary Detail", row.name, {
+                    "formula": c["formula"],
+                    "amount_based_on_formula": 1,
+                    "depends_on_payment_days": 0,
+                    "do_not_include_in_total": c["do_not_include_in_total"],
+                })
+            else:
+                new_row = ss.append(table, {
+                    "salary_component": c["name"],
+                    "abbr": c["abbr"],
+                    "amount_based_on_formula": 1,
+                    "formula": c["formula"],
+                    "depends_on_payment_days": 0,
+                    "do_not_include_in_total": c["do_not_include_in_total"],
+                })
+                new_row.idx = 0
+                new_row.db_insert()
 
 
 def create_salary_structure(company, structure_name=None, submit=True):
@@ -218,6 +201,7 @@ def create_salary_structure(company, structure_name=None, submit=True):
             "amount_based_on_formula": 1,
             "formula": c["formula"],
             "depends_on_payment_days": 0,
+            "do_not_include_in_total": c["do_not_include_in_total"],
         })
 
     ss.flags.ignore_permissions = True
