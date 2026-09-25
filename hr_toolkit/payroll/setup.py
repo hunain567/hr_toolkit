@@ -2,9 +2,10 @@ import frappe
 from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
-# Deduction formula reads from Salary Slip fields that are filled
-# by hr_toolkit.payroll.salary_slip before the formula is evaluated.
-ABSENT_FORMULA = "round(base / fixed_working_days * deduct_days) if fixed_working_days else 0"
+# Absent deduction is applied inside Basic.
+# fixed_working_days and deduct_days are filled on the Salary Slip
+# by hr_toolkit.payroll.salary_slip before formulas are evaluated.
+BASIC_FORMULA = "base - (round(base / fixed_working_days * deduct_days) if fixed_working_days else 0)"
 
 COMPONENTS = [
     {
@@ -20,21 +21,15 @@ COMPONENTS = [
         "name": "Basic",
         "abbr": "B",
         "type": "Earning",
-        "formula": "base",
+        "formula": BASIC_FORMULA,
         "remove_if_zero": 0,
         "do_not_include_in_total": 0,
-        "description": "Full monthly salary. Not prorated by month length.",
-    },
-    {
-        "name": "Attendance Deduction",
-        "abbr": "AD",
-        "type": "Deduction",
-        "formula": ABSENT_FORMULA,
-        "remove_if_zero": 1,
-        "do_not_include_in_total": 0,
-        "description": "Per day salary (Salary / Working Days from HR Toolkit Settings) x Deduction Days.",
+        "description": "Monthly salary less absent days (Salary / Working Days from HR Toolkit Settings x Deduction Days).",
     },
 ]
+
+# Components no longer used by this app. Removed from app-created structures.
+REMOVED_COMPONENTS = ["Attendance Deduction"]
 
 # Helper fields used by formulas. Hidden on the form.
 CUSTOM_FIELDS = {
@@ -94,6 +89,7 @@ DEFAULT_SETTINGS = {
 
 def setup_custom_fields():
     create_custom_fields(CUSTOM_FIELDS, update=True)
+    frappe.db.updatedb("Salary Slip")
 
 
 def setup_settings():
@@ -148,12 +144,19 @@ def setup_salary_components():
 
 def update_structure_formulas():
     """Sync app components into structures created by this app ('Standard Salary - XX').
-    Updates existing rows and adds missing ones."""
+    Updates existing rows, adds missing ones and removes retired components."""
     structures = frappe.get_all(
         "Salary Structure", filters={"name": ["like", "Standard Salary - %"]}, pluck="name"
     )
     for name in structures:
         ss = frappe.get_doc("Salary Structure", name)
+
+        for comp in REMOVED_COMPONENTS:
+            frappe.db.delete(
+                "Salary Detail",
+                {"parenttype": "Salary Structure", "parent": name, "salary_component": comp},
+            )
+
         for c in COMPONENTS:
             table = "earnings" if c["type"] == "Earning" else "deductions"
             row = next((r for r in ss.get(table) if r.salary_component == c["name"]), None)
