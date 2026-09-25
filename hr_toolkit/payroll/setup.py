@@ -1,3 +1,5 @@
+import copy
+
 import frappe
 from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
@@ -25,6 +27,7 @@ COMPONENTS = [
     },
 ]
 
+# Helper fields used by formulas. Hidden on the form.
 CUSTOM_FIELDS = {
     "Salary Slip": [
         {
@@ -80,8 +83,32 @@ DEFAULT_SETTINGS = {
 }
 
 
+def get_field_before(doctype, fieldname, skip=()):
+    """Return the fieldname placed just before `fieldname` on the form."""
+    fields = [df.fieldname for df in frappe.get_meta(doctype).fields if df.fieldname not in skip]
+    if fieldname in fields:
+        i = fields.index(fieldname)
+        if i > 0:
+            return fields[i - 1]
+    return None
+
+
 def setup_custom_fields():
-    create_custom_fields(CUSTOM_FIELDS, update=True)
+    fields = copy.deepcopy(CUSTOM_FIELDS)
+    fields["Salary Slip"].append(
+        {
+            "fieldname": "hrt_monthly_salary",
+            "label": "Monthly Salary",
+            "fieldtype": "Currency",
+            "options": "currency",
+            "insert_after": get_field_before("Salary Slip", "earnings", skip=("hrt_monthly_salary",))
+            or "salary_structure",
+            "read_only": 1,
+            "bold": 1,
+            "description": "Salary as per Salary Structure Assignment",
+        }
+    )
+    create_custom_fields(fields, update=True)
 
 
 def setup_settings():
@@ -144,6 +171,27 @@ def update_structure_formulas():
                  and salary_component = %s""",
             (c["formula"], c["name"]),
         )
+
+
+def backfill_monthly_salary():
+    """Fill Monthly Salary on existing (draft and submitted) salary slips."""
+    from hr_toolkit.payroll.salary_slip import get_monthly_salary
+
+    slips = frappe.get_all(
+        "Salary Slip",
+        filters={"docstatus": ["<", 2]},
+        fields=["name", "employee", "salary_structure", "end_date"],
+    )
+    for s in slips:
+        frappe.db.set_value(
+            "Salary Slip",
+            s.name,
+            "hrt_monthly_salary",
+            get_monthly_salary(s.employee, s.salary_structure, s.end_date),
+            update_modified=False,
+        )
+    frappe.db.commit()
+    print(f"Monthly Salary updated on {len(slips)} salary slip(s).")
 
 
 def create_salary_structure(company, structure_name=None, submit=True):

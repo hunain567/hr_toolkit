@@ -23,10 +23,23 @@ def get_holidays(employee, start, end):
         return set()
 
 
+def get_monthly_salary(employee, salary_structure, end_date):
+    """Base salary from the latest submitted Salary Structure Assignment on or before end_date."""
+    filters = {"employee": employee, "docstatus": 1, "from_date": ["<=", end_date]}
+    if salary_structure:
+        filters["salary_structure"] = salary_structure
+    base = frappe.db.get_value(
+        "Salary Structure Assignment", filters, "base", order_by="from_date desc"
+    )
+    return flt(base)
+
+
 def calculate_deduction_days(doc, method=None):
-    """before_validate: fill absent/unmarked/deduction days as per HR Toolkit Settings."""
+    """before_validate: fill monthly salary and absent/unmarked/deduction days as per HR Toolkit Settings."""
     if not (doc.employee and doc.start_date and doc.end_date):
         return
+
+    doc.hrt_monthly_salary = get_monthly_salary(doc.employee, doc.salary_structure, doc.end_date)
 
     s = get_settings()
     start, end = getdate(doc.start_date), getdate(doc.end_date)
