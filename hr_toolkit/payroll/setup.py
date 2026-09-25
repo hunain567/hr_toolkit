@@ -38,7 +38,7 @@ CUSTOM_FIELDS = {
             "description": "Attendance marked as Absent in this period",
         },
         {
-            "fieldname": "unmarked_days",
+            "fieldname": "hrt_unmarked_days",
             "label": "Unmarked Days",
             "fieldtype": "Float",
             "insert_after": "full_absent_days",
@@ -51,7 +51,7 @@ CUSTOM_FIELDS = {
             "fieldname": "deduct_days",
             "label": "Deduction Days",
             "fieldtype": "Float",
-            "insert_after": "unmarked_days",
+            "insert_after": "hrt_unmarked_days",
             "read_only": 1,
             "hidden": 1,
             "default": "0",

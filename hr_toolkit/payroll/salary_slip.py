@@ -78,7 +78,7 @@ def calculate_deduction_days(doc, method=None):
     deduct = full + unmarked + outside + (half * s.half_day_value if s.count_half_day else 0)
 
     doc.full_absent_days = full
-    doc.unmarked_days = unmarked
+    doc.hrt_unmarked_days = unmarked
     doc.fixed_working_days = s.working_days
     doc.deduct_days = min(deduct, s.working_days)
 
@@ -89,5 +89,5 @@ def set_fixed_payment_days(doc, method=None):
     if not s.show_fixed_days_on_slip:
         return
     doc.total_working_days = s.working_days
-    doc.absent_days = flt(doc.full_absent_days) + flt(doc.unmarked_days)
+    doc.absent_days = flt(doc.full_absent_days) + flt(doc.hrt_unmarked_days)
     doc.payment_days = s.working_days - flt(doc.deduct_days)
