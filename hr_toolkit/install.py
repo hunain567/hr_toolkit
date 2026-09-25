@@ -15,8 +15,8 @@ def after_install():
         setup_salary_components()
         frappe.db.commit()
     except Exception:
-        frappe.log_error(title="HR Toolkit after_install failed")
-        print("⚠️ HR Toolkit setup mein masla aaya, Error Log check karein.")
+        frappe.log_error(title="HR Toolkit: after_install failed")
+        print("HR Toolkit setup failed. Please check Error Log.")
 
 
 def after_migrate():
@@ -24,4 +24,4 @@ def after_migrate():
         setup_custom_fields()
         setup_settings()
     except Exception:
-        frappe.log_error(title="HR Toolkit after_migrate failed")
+        frappe.log_error(title="HR Toolkit: after_migrate failed")

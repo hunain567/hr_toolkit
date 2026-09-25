@@ -23,7 +23,7 @@ def get_holidays(employee, start, end):
 
 
 def calculate_deduction_days(doc, method=None):
-    """before_validate: settings ke hisaab se Full Day Absents aur Deduction Days bharo."""
+    """before_validate: fill Full Day Absents and Deduction Days as per HR Toolkit Settings."""
     if not (doc.employee and doc.start_date and doc.end_date):
         return
 
@@ -72,7 +72,7 @@ def calculate_deduction_days(doc, method=None):
 
 
 def set_fixed_payment_days(doc, method=None):
-    """validate: ERPNext ke calculation ke baad Working Days / Payment Days settings se."""
+    """validate: after the standard calculation, set Working Days and Payment Days from settings."""
     s = get_settings()
     if not s.show_fixed_days_on_slip:
         return

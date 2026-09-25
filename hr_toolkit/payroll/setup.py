@@ -1,9 +1,10 @@
 import frappe
+from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.utils import cint
 
-# Formula ab settings se chalta hai (HR Toolkit Settings > Working Days).
-# fixed_working_days aur deduct_days slip save hone se pehle app khud bharti hai.
+# Deduction formula reads from Salary Slip fields that are filled
+# by hr_toolkit.payroll.salary_slip before the formula is evaluated.
 ABSENT_FORMULA = "round(base / fixed_working_days * deduct_days) if fixed_working_days else 0"
 
 COMPONENTS = [
@@ -13,7 +14,7 @@ COMPONENTS = [
         "type": "Earning",
         "formula": "base",
         "remove_if_zero": 0,
-        "description": "Full monthly salary (gross). Month days se prorate nahi hoti.",
+        "description": "Full monthly salary. Not prorated by month length.",
     },
     {
         "name": "Attendance Deduction",
@@ -21,7 +22,7 @@ COMPONENTS = [
         "type": "Deduction",
         "formula": ABSENT_FORMULA,
         "remove_if_zero": 1,
-        "description": "Per day = salary / Working Days (HR Toolkit Settings), Deduction Days ke hisaab se.",
+        "description": "Per day salary (Salary / Working Days from HR Toolkit Settings) x Deduction Days.",
     },
 ]
 
@@ -34,7 +35,7 @@ CUSTOM_FIELDS = {
             "insert_after": "absent_days",
             "read_only": 1,
             "default": "0",
-            "description": "Sirf Absent status wale din",
+            "description": "Attendance marked as Absent in this period",
         },
         {
             "fieldname": "deduct_days",
@@ -43,7 +44,7 @@ CUSTOM_FIELDS = {
             "insert_after": "full_absent_days",
             "read_only": 1,
             "default": "0",
-            "description": "Jitne din ki salary kategi (HR Toolkit Settings ke rules se)",
+            "description": "Days deducted from salary as per HR Toolkit Settings",
         },
         {
             "fieldname": "fixed_working_days",
@@ -51,7 +52,7 @@ CUSTOM_FIELDS = {
             "fieldtype": "Int",
             "insert_after": "deduct_days",
             "read_only": 1,
-            "description": "HR Toolkit Settings se",
+            "description": "From HR Toolkit Settings",
         },
     ]
 }
@@ -71,7 +72,7 @@ def setup_custom_fields():
 
 
 def setup_settings():
-    """Sirf pehli dafa defaults bharo, user ki badli hui settings ko na chhero."""
+    """Set defaults only once. Never overwrite settings changed by the user."""
     if not frappe.db.exists("DocType", "HR Toolkit Settings"):
         return
     s = frappe.get_single("HR Toolkit Settings")
@@ -95,8 +96,9 @@ def setup_salary_components():
         )
         if clash:
             frappe.throw(
-                f"Abbr '{c['abbr']}' pehle se '{clash}' component mein use ho raha hai. "
-                f"Pehle us ka Abbr change karein."
+                _("Abbreviation '{0}' is already used by Salary Component '{1}'. Please change it first.").format(
+                    c["abbr"], clash
+                )
             )
 
         if frappe.db.exists("Salary Component", c["name"]):
@@ -118,7 +120,7 @@ def setup_salary_components():
 
 
 def update_structure_formulas():
-    """Sirf app ke banaye 'Standard Salary - XX' structures ke formula update karo."""
+    """Update formulas only in structures created by this app ('Standard Salary - XX')."""
     for c in COMPONENTS:
         frappe.db.sql(
             """update `tabSalary Detail`
@@ -136,7 +138,7 @@ def create_salary_structure(company, structure_name=None, submit=True):
     structure_name = structure_name or f"Standard Salary - {abbr}"
 
     if frappe.db.exists("Salary Structure", structure_name):
-        print(f"Salary Structure '{structure_name}' pehle se mojood hai.")
+        print(f"Salary Structure '{structure_name}' already exists.")
         return structure_name
 
     ss = frappe.new_doc("Salary Structure")
@@ -161,7 +163,7 @@ def create_salary_structure(company, structure_name=None, submit=True):
     if submit:
         ss.submit()
 
-    print(f"Salary Structure '{structure_name}' ban gaya.")
+    print(f"Salary Structure '{structure_name}' created.")
     return structure_name
 
 
@@ -175,4 +177,4 @@ def run(company=None):
     if company:
         create_salary_structure(company)
     frappe.db.commit()
-    print("✅ HR Toolkit payroll setup mukammal.")
+    print("HR Toolkit payroll setup completed.")
