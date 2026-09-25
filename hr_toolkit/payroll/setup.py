@@ -1,7 +1,6 @@
 import frappe
 from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
-from frappe.utils import cint
 
 # Deduction formula reads from Salary Slip fields that are filled
 # by hr_toolkit.payroll.salary_slip before the formula is evaluated.
@@ -34,15 +33,27 @@ CUSTOM_FIELDS = {
             "fieldtype": "Float",
             "insert_after": "absent_days",
             "read_only": 1,
+            "hidden": 1,
             "default": "0",
             "description": "Attendance marked as Absent in this period",
+        },
+        {
+            "fieldname": "unmarked_days",
+            "label": "Unmarked Days",
+            "fieldtype": "Float",
+            "insert_after": "full_absent_days",
+            "read_only": 1,
+            "hidden": 1,
+            "default": "0",
+            "description": "Working days up to today with no attendance record",
         },
         {
             "fieldname": "deduct_days",
             "label": "Deduction Days",
             "fieldtype": "Float",
-            "insert_after": "full_absent_days",
+            "insert_after": "unmarked_days",
             "read_only": 1,
+            "hidden": 1,
             "default": "0",
             "description": "Days deducted from salary as per HR Toolkit Settings",
         },
@@ -52,6 +63,7 @@ CUSTOM_FIELDS = {
             "fieldtype": "Int",
             "insert_after": "deduct_days",
             "read_only": 1,
+            "hidden": 1,
             "description": "From HR Toolkit Settings",
         },
     ]
@@ -60,6 +72,7 @@ CUSTOM_FIELDS = {
 DEFAULT_SETTINGS = {
     "working_days": 26,
     "show_fixed_days_on_slip": 1,
+    "count_unmarked_as_absent": 1,
     "exclude_holidays": 1,
     "count_half_day": 0,
     "half_day_value": 0.5,
@@ -72,15 +85,16 @@ def setup_custom_fields():
 
 
 def setup_settings():
-    """Set defaults only once. Never overwrite settings changed by the user."""
+    """Fill defaults only for settings never saved before. Never overwrite user changes."""
     if not frappe.db.exists("DocType", "HR Toolkit Settings"):
         return
-    s = frappe.get_single("HR Toolkit Settings")
-    if cint(s.working_days):
-        return
-    s.update(DEFAULT_SETTINGS)
-    s.flags.ignore_permissions = True
-    s.save()
+    saved = set(
+        frappe.db.sql_list("select field from `tabSingles` where doctype = 'HR Toolkit Settings'")
+    )
+    for key, value in DEFAULT_SETTINGS.items():
+        if key not in saved:
+            frappe.db.set_single_value("HR Toolkit Settings", key, value)
+    frappe.clear_document_cache("HR Toolkit Settings", "HR Toolkit Settings")
 
 
 def setup_payroll_settings():
