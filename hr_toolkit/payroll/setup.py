@@ -80,6 +80,7 @@ DEFAULT_SETTINGS = {
     "working_days": 26,
     "show_fixed_days_on_slip": 1,
     "count_unmarked_as_absent": 1,
+    "include_future_dates": 1,
     "exclude_holidays": 1,
     "count_half_day": 0,
     "half_day_value": 0.5,

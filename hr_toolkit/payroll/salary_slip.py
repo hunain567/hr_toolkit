@@ -8,6 +8,7 @@ def get_settings():
         working_days=cint(s.working_days) or 26,
         show_fixed_days_on_slip=cint(s.show_fixed_days_on_slip),
         count_unmarked_as_absent=cint(s.count_unmarked_as_absent),
+        include_future_dates=cint(s.include_future_dates),
         exclude_holidays=cint(s.exclude_holidays),
         count_half_day=cint(s.count_half_day),
         half_day_value=flt(s.half_day_value) or 0.5,
@@ -71,7 +72,11 @@ def calculate_deduction_days(doc, method=None):
             if not in_service:
                 if s.deduct_before_joining:
                     outside += 1
-            elif s.count_unmarked_as_absent and d <= today and d not in attendance:
+            elif (
+                s.count_unmarked_as_absent
+                and (s.include_future_dates or d <= today)
+                and d not in attendance
+            ):
                 unmarked += 1
         d = getdate(add_days(d, 1))
 
