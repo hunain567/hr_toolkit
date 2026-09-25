@@ -247,3 +247,12 @@ app_license = "mit"
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
+
+required_apps = ["hrms"]
+after_install = "hr_toolkit.install.after_install"
+
+doc_events = {
+    "Salary Slip": {
+        "before_validate": "hr_toolkit.payroll.salary_slip.set_full_absent_days",
+    }
+}
