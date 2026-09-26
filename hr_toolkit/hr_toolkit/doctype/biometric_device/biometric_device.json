@@ -1,0 +1,389 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:device_name",
+ "creation": "2026-09-26 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "device_name",
+  "enabled",
+  "location",
+  "column_break_general",
+  "punch_direction",
+  "import_from_date",
+  "real_time_capture",
+  "section_connection",
+  "connection_mode",
+  "serial_number",
+  "ip_address",
+  "port",
+  "column_break_connection",
+  "push_setup_help",
+  "comm_password",
+  "timeout",
+  "force_udp",
+  "section_live",
+  "live_status",
+  "live_connected_since",
+  "column_break_live",
+  "live_last_seen",
+  "live_restart_requested",
+  "section_status",
+  "last_synced_on",
+  "last_sync_status",
+  "last_punch_time",
+  "column_break_status",
+  "last_sync_message",
+  "last_heartbeat",
+  "last_request_ip",
+  "push_attlog_stamp",
+  "section_device_info",
+  "device_model_name",
+  "firmware_version",
+  "platform",
+  "column_break_device_info",
+  "user_count",
+  "record_count",
+  "device_time",
+  "info_checked_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "device_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Device Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Enabled"
+  },
+  {
+   "description": "e.g. Main Gate, Production Hall",
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Location"
+  },
+  {
+   "fieldname": "column_break_general",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "AUTO",
+   "description": "AUTO: log type is left empty (set by Shift Type or your own scripts). IN / OUT: every punch from this device gets that log type. Device Punch State: uses the IN/OUT key pressed on the device.",
+   "fieldname": "punch_direction",
+   "fieldtype": "Select",
+   "label": "Punch Direction",
+   "options": "AUTO\nIN\nOUT\nDevice Punch State",
+   "reqd": 1
+  },
+  {
+   "description": "Punches before this date are ignored on the first sync. Leave empty to import everything stored on the device.",
+   "fieldname": "import_from_date",
+   "fieldtype": "Date",
+   "label": "Import Punches From"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.connection_mode!='Push (ADMS)'",
+   "description": "Keep a live connection to the device so each punch becomes an Employee Checkin within seconds. Requires the Biometric Live Listener service on the server. Scheduled syncs skip this device; the listener imports missed punches itself on every reconnect.",
+   "fieldname": "real_time_capture",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Real-time (Live Capture)"
+  },
+  {
+   "fieldname": "section_connection",
+   "fieldtype": "Section Break",
+   "label": "Connection"
+  },
+  {
+   "default": "Pull (TCP/IP)",
+   "description": "Push (ADMS): the device sends every punch to ERPNext immediately (real time). Pull (TCP/IP): ERPNext reads punches from the device at the sync interval.",
+   "fieldname": "connection_mode",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Connection Mode",
+   "options": "Pull (TCP/IP)\nPush (ADMS)",
+   "reqd": 1
+  },
+  {
+   "description": "Required for Push (ADMS). Shown on the device under System Info / Device Info.",
+   "fieldname": "serial_number",
+   "fieldtype": "Data",
+   "label": "Serial Number",
+   "mandatory_depends_on": "eval:doc.connection_mode=='Push (ADMS)'",
+   "no_copy": 1,
+   "unique": 1
+  },
+  {
+   "description": "Pull: the device IP to connect to. Push: optional, when set only requests from this IP are accepted.",
+   "fieldname": "ip_address",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "IP Address",
+   "mandatory_depends_on": "eval:doc.connection_mode=='Pull (TCP/IP)'"
+  },
+  {
+   "default": "4370",
+   "depends_on": "eval:doc.connection_mode=='Pull (TCP/IP)'",
+   "fieldname": "port",
+   "fieldtype": "Int",
+   "label": "Port"
+  },
+  {
+   "fieldname": "column_break_connection",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.connection_mode=='Push (ADMS)'",
+   "fieldname": "push_setup_help",
+   "fieldtype": "HTML",
+   "label": "Push Setup Help"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.connection_mode=='Pull (TCP/IP)'",
+   "description": "Device menu: Comm. / Communication settings. Usually 0.",
+   "fieldname": "comm_password",
+   "fieldtype": "Int",
+   "label": "Communication Key"
+  },
+  {
+   "default": "30",
+   "depends_on": "eval:doc.connection_mode=='Pull (TCP/IP)'",
+   "fieldname": "timeout",
+   "fieldtype": "Int",
+   "label": "Timeout (Seconds)"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.connection_mode=='Pull (TCP/IP)'",
+   "description": "Enable only for older devices that do not support TCP.",
+   "fieldname": "force_udp",
+   "fieldtype": "Check",
+   "label": "Force UDP"
+  },
+  {
+   "depends_on": "eval:doc.real_time_capture",
+   "fieldname": "section_live",
+   "fieldtype": "Section Break",
+   "label": "Live Capture"
+  },
+  {
+   "fieldname": "live_status",
+   "fieldtype": "Select",
+   "label": "Live Status",
+   "no_copy": 1,
+   "options": "\nConnecting\nConnected\nDisconnected\nStopped",
+   "read_only": 1
+  },
+  {
+   "fieldname": "live_connected_since",
+   "fieldtype": "Datetime",
+   "label": "Connected Since",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_live",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Updated about every minute while the listener is connected.",
+   "fieldname": "live_last_seen",
+   "fieldtype": "Datetime",
+   "label": "Listener Last Seen",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "live_restart_requested",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Live Restart Requested",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_status",
+   "fieldtype": "Section Break",
+   "label": "Sync Status"
+  },
+  {
+   "fieldname": "last_synced_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Last Synced On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_sync_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Last Sync Status",
+   "no_copy": 1,
+   "options": "\nSuccess\nPartial\nFailed",
+   "read_only": 1
+  },
+  {
+   "description": "Next sync imports only punches after this time. Use \"Reset Sync Pointer\" to re-read all punches.",
+   "fieldname": "last_punch_time",
+   "fieldtype": "Datetime",
+   "label": "Last Imported Punch",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_sync_message",
+   "fieldtype": "Small Text",
+   "label": "Last Sync Message",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.connection_mode=='Push (ADMS)'",
+   "description": "Last time the device contacted the server. Updates about every 10 seconds when online.",
+   "fieldname": "last_heartbeat",
+   "fieldtype": "Datetime",
+   "label": "Last Heartbeat",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.connection_mode=='Push (ADMS)'",
+   "fieldname": "last_request_ip",
+   "fieldtype": "Data",
+   "label": "Last Request IP",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "push_attlog_stamp",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Push Attendance Stamp",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "description": "Filled by \"Test Connection\".",
+   "fieldname": "section_device_info",
+   "fieldtype": "Section Break",
+   "label": "Device Information"
+  },
+  {
+   "fieldname": "device_model_name",
+   "fieldtype": "Data",
+   "label": "Model",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "firmware_version",
+   "fieldtype": "Data",
+   "label": "Firmware Version",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "platform",
+   "fieldtype": "Data",
+   "label": "Platform",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_device_info",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "user_count",
+   "fieldtype": "Int",
+   "label": "Users on Device",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "record_count",
+   "fieldtype": "Int",
+   "label": "Punch Records on Device",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "device_time",
+   "fieldtype": "Datetime",
+   "label": "Device Clock",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "info_checked_on",
+   "fieldtype": "Datetime",
+   "label": "Checked On",
+   "no_copy": 1,
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [
+  {
+   "group": "Sync",
+   "link_doctype": "Biometric Sync Log",
+   "link_fieldname": "device"
+  }
+ ],
+ "modified": "2026-09-26 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HR Toolkit",
+ "name": "Biometric Device",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "device_name",
+ "track_changes": 1
+}

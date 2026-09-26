@@ -1,0 +1,92 @@
+{
+ "actions": [],
+ "creation": "2026-09-26 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enable_auto_sync",
+  "sync_interval_minutes",
+  "column_break_sync",
+  "update_shift_type_last_sync",
+  "section_logs",
+  "log_empty_syncs",
+  "column_break_logs",
+  "keep_logs_for_days"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "description": "Sync all enabled devices in the background at the interval below.",
+   "fieldname": "enable_auto_sync",
+   "fieldtype": "Check",
+   "label": "Enable Auto Sync"
+  },
+  {
+   "default": "15",
+   "description": "Minimum 5 minutes.",
+   "fieldname": "sync_interval_minutes",
+   "fieldtype": "Int",
+   "label": "Sync Interval (Minutes)"
+  },
+  {
+   "fieldname": "column_break_sync",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "After new checkins are imported, set \"Last Sync of Checkin\" on Shift Types with Auto Attendance enabled, so attendance can be marked from them.",
+   "fieldname": "update_shift_type_last_sync",
+   "fieldtype": "Check",
+   "label": "Update Shift Type Last Sync"
+  },
+  {
+   "fieldname": "section_logs",
+   "fieldtype": "Section Break",
+   "label": "Sync Logs"
+  },
+  {
+   "default": "0",
+   "description": "If unchecked, scheduled syncs that import nothing and have no errors are not logged.",
+   "fieldname": "log_empty_syncs",
+   "fieldtype": "Check",
+   "label": "Log Scheduled Syncs With No New Punches"
+  },
+  {
+   "fieldname": "column_break_logs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "30",
+   "fieldname": "keep_logs_for_days",
+   "fieldtype": "Int",
+   "label": "Keep Sync Logs For (Days)"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-26 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HR Toolkit",
+ "name": "Biometric Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "HR Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

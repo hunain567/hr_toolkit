@@ -258,3 +258,18 @@ doc_events = {
         "validate": "hr_toolkit.payroll.salary_slip.set_fixed_payment_days",
     }
 }
+
+# Biometric device sync (ZKTeco)
+scheduler_events = {
+	"cron": {
+		"*/5 * * * *": [
+			"hr_toolkit.biometric_sync.scheduled_sync",
+		],
+	},
+	"daily": [
+		"hr_toolkit.biometric_sync.cleanup_sync_logs",
+	],
+}
+
+# Push (ADMS) mode: real-time punches from ZKTeco devices
+page_renderer = ["hr_toolkit.biometric_push.ZKPushRenderer"]

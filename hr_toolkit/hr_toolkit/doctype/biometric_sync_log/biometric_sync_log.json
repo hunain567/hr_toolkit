@@ -1,0 +1,189 @@
+{
+ "actions": [],
+ "autoname": "BSL-.YYYY.-.#####",
+ "creation": "2026-09-26 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "device",
+  "status",
+  "triggered_by",
+  "column_break_main",
+  "started_on",
+  "finished_on",
+  "section_summary",
+  "total_fetched",
+  "new_punches",
+  "checkins_created",
+  "column_break_summary",
+  "duplicates",
+  "unmatched",
+  "failed",
+  "skipped_future",
+  "section_details",
+  "unmatched_user_ids",
+  "error_message",
+  "error_log"
+ ],
+ "fields": [
+  {
+   "fieldname": "device",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Device",
+   "options": "Biometric Device",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Success\nPartial\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "triggered_by",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Triggered By",
+   "options": "Manual\nScheduler\nPush\nLive",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "started_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Started On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "finished_on",
+   "fieldtype": "Datetime",
+   "label": "Finished On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_summary",
+   "fieldtype": "Section Break",
+   "label": "Summary"
+  },
+  {
+   "fieldname": "total_fetched",
+   "fieldtype": "Int",
+   "label": "Records on Device",
+   "read_only": 1
+  },
+  {
+   "fieldname": "new_punches",
+   "fieldtype": "Int",
+   "label": "New Punches Found",
+   "read_only": 1
+  },
+  {
+   "fieldname": "checkins_created",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Checkins Created",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_summary",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "duplicates",
+   "fieldtype": "Int",
+   "label": "Already Imported",
+   "read_only": 1
+  },
+  {
+   "fieldname": "unmatched",
+   "fieldtype": "Int",
+   "label": "Unmatched Punches",
+   "read_only": 1
+  },
+  {
+   "fieldname": "failed",
+   "fieldtype": "Int",
+   "label": "Failed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "skipped_future",
+   "fieldtype": "Int",
+   "label": "Future-Dated (Skipped)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_details",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "description": "Device user IDs with no active Employee whose \"Attendance Device ID\" matches. Set that field on the Employee, then use \"Reset Sync Pointer\" on the device and sync again.",
+   "fieldname": "unmatched_user_ids",
+   "fieldtype": "Small Text",
+   "label": "Unmatched Device User IDs",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error_message",
+   "fieldtype": "Small Text",
+   "label": "Error Message",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error_log",
+   "fieldtype": "Code",
+   "label": "Error Traceback",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-26 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HR Toolkit",
+ "name": "Biometric Sync Log",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 0,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 0
+  },
+  {
+   "create": 0,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "device"
+}
