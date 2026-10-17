@@ -2,9 +2,10 @@ import frappe
 from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
-# Basic reads the earned amount calculated by hr_toolkit.payroll.salary_slip
+# Basic and Over Time read amounts calculated by hr_toolkit.payroll.salary_slip
 # before salary component formulas are evaluated.
 BASIC_FORMULA = "hrt_earned_basic"
+OVERTIME_FORMULA = "hrt_overtime_amount"
 
 COMPONENTS = [
     {
@@ -24,6 +25,15 @@ COMPONENTS = [
         "remove_if_zero": 0,
         "do_not_include_in_total": 0,
         "description": "Earned basic salary as per HR Toolkit Settings. See Calculation Details on the Salary Slip.",
+    },
+    {
+        "name": "Over Time",
+        "abbr": "OT",
+        "type": "Earning",
+        "formula": OVERTIME_FORMULA,
+        "remove_if_zero": 1,
+        "do_not_include_in_total": 0,
+        "description": "Daily Rate / Shift Hours x Overtime Hours (from Attendance) x Overtime Rate Multiplier.",
     },
 ]
 
@@ -47,12 +57,17 @@ def _ro(fieldname, label, fieldtype, insert_after, **extra):
 
 CUSTOM_FIELDS = {
     "Salary Slip": [
+        # Shown next to the standard Absent Days field
+        _ro("full_absent_days", "Absent Days (Marked)", "Float", "absent_days"),
+        _ro("hrt_unmarked_days", "Unmarked Days", "Float", "full_absent_days"),
+        # Calculation Details section
         {
             "fieldname": "hrt_calc_section",
             "label": "Calculation Details",
             "fieldtype": "Section Break",
             "insert_after": "payment_days",
             "collapsible": 1,
+            "hidden": 0,
         },
         _ro("hrt_calculation_method", "Calculation Method", "Data", "hrt_calc_section"),
         _ro("hrt_base_salary", "Monthly Salary", "Currency", "hrt_calculation_method", options="currency"),
@@ -60,21 +75,46 @@ CUSTOM_FIELDS = {
         _ro("hrt_daily_rate", "Daily Rate", "Currency", "fixed_working_days", options="currency"),
         _ro("hrt_full_period", "Full Period Employee", "Check", "hrt_daily_rate"),
         _ro("hrt_earned_basic", "Earned Basic", "Currency", "hrt_full_period", options="currency", bold=1),
-        {"fieldname": "hrt_calc_cb", "fieldtype": "Column Break", "insert_after": "hrt_earned_basic"},
+        _ro("hrt_hourly_rate", "Hourly Rate (Default Shift)", "Currency", "hrt_earned_basic", options="currency"),
+        _ro("hrt_overtime_hours", "Overtime Hours", "Float", "hrt_hourly_rate"),
+        _ro("hrt_overtime_amount", "Overtime Amount", "Currency", "hrt_overtime_hours", options="currency", bold=1),
+        _ro("hrt_overtime_eligibility", "Overtime Eligibility", "Data", "hrt_overtime_amount"),
+        {"fieldname": "hrt_calc_cb", "fieldtype": "Column Break", "insert_after": "hrt_overtime_eligibility", "hidden": 0},
         _ro("hrt_payable_days", "Payable Days", "Float", "hrt_calc_cb", bold=1),
         _ro("deduct_days", "Chargeable Days", "Float", "hrt_payable_days"),
         _ro("hrt_present_days", "Present Days", "Float", "deduct_days"),
         _ro("hrt_paid_leave_days", "Paid Leave Days", "Float", "hrt_present_days"),
-        _ro("full_absent_days", "Absent Days (Marked)", "Float", "hrt_paid_leave_days"),
-        _ro("hrt_unmarked_days", "Unmarked Days", "Float", "full_absent_days"),
-        _ro("hrt_lwp_days", "Leave Without Pay Days", "Float", "hrt_unmarked_days"),
+        _ro("hrt_lwp_days", "Leave Without Pay Days", "Float", "hrt_paid_leave_days"),
         _ro("hrt_half_days", "Half Days", "Float", "hrt_lwp_days"),
         _ro("hrt_sandwich_days", "Sandwich Weekly Offs", "Float", "hrt_half_days"),
         _ro("hrt_weekly_off_days", "Weekly Offs", "Float", "hrt_sandwich_days"),
         _ro("hrt_holiday_days", "Holidays", "Float", "hrt_weekly_off_days"),
         _ro("hrt_outside_days", "Days Outside Employment", "Float", "hrt_holiday_days"),
         _ro("hrt_future_days", "Days After Cut-off", "Float", "hrt_outside_days"),
-    ]
+    ],
+    "Attendance": [
+        {
+            "fieldname": "overtime_hours",
+            "label": "Overtime Hours",
+            "fieldtype": "Float",
+            "insert_after": "status",
+            "description": "Calculated from Employee Checkin (information only). Salary uses submitted Overtime Entry.",
+        },
+    ],
+    "Shift Type": [
+        {"fieldname": "hrt_break_start", "label": "Break Start", "fieldtype": "Time", "insert_after": "end_time"},
+        {"fieldname": "hrt_break_end", "label": "Break End", "fieldtype": "Time", "insert_after": "hrt_break_start"},
+        _ro("hrt_break_minutes", "Break (Minutes)", "Int", "hrt_break_end"),
+        _ro("hrt_shift_hours", "Shift Hours", "Float", "hrt_break_minutes",
+            description="End Time - Start Time - Break. Used for the overtime hourly rate."),
+        {
+            "fieldname": "hrt_overtime_multiplier",
+            "label": "Overtime Rate Multiplier",
+            "fieldtype": "Float",
+            "insert_after": "hrt_shift_hours",
+            "description": "1 = Single, 2 = Double. Leave 0 to use the default from HR Toolkit Settings.",
+        },
+    ],
 }
 
 DEFAULT_SETTINGS = {
@@ -92,12 +132,68 @@ DEFAULT_SETTINGS = {
     "count_half_day": 0,
     "half_day_value": 0.5,
     "proration_basis": "Working Days",
+    "enable_overtime": 1,
+    "overtime_from_checkin": 1,
+    "overtime_rounding": 1,
+    "overtime_min_minutes": 30,
+    "overtime_round_minutes": 60,
 }
+
+PAYMENT_DAYS_LEFT = ["total_working_days", "payment_days", "absent_days"]
+PAYMENT_DAYS_RIGHT = ["full_absent_days", "hrt_unmarked_days", "leave_without_pay"]
 
 
 def setup_custom_fields():
     create_custom_fields(CUSTOM_FIELDS, update=True)
-    frappe.db.updatedb("Salary Slip")
+    for doctype in CUSTOM_FIELDS:
+        frappe.db.updatedb(doctype)
+    setup_payment_days_layout()
+
+
+def setup_payment_days_layout():
+    """Arrange the Payment Days section of Salary Slip:
+    left column  - Working Days, Payment Days, Absent Days
+    right column - Absent Days (Marked), Unmarked Days, Leave Without Pay
+    Uses a field_order Property Setter (same as Customize Form)."""
+    import json
+    from frappe.custom.doctype.property_setter.property_setter import make_property_setter
+
+    # Rebuild from the standard order so newly added fields are placed by insert_after
+    frappe.db.delete("Property Setter", {"doc_type": "Salary Slip", "property": "field_order"})
+    frappe.clear_cache(doctype="Salary Slip")
+    meta = frappe.get_meta("Salary Slip")
+    order = [df.fieldname for df in meta.fields]
+    block = PAYMENT_DAYS_LEFT + PAYMENT_DAYS_RIGHT
+
+    missing = [f for f in block if f not in order]
+    if missing:
+        print("Payment Days layout skipped, fields not found:", missing)
+        return
+
+    positions = [order.index(f) for f in block]
+    first, last = min(positions), max(positions)
+
+    column_break = None
+    for f in order[first:last + 1]:
+        if meta.get_field(f).fieldtype == "Column Break":
+            column_break = f
+            break
+    if not column_break:
+        print("Payment Days layout skipped, no column break found in the section.")
+        return
+
+    remove = set(block + [column_break])
+    rest = [f for f in order if f not in remove]
+    insert_at = len([f for f in order[:first] if f not in remove])
+    new_order = (
+        rest[:insert_at] + PAYMENT_DAYS_LEFT + [column_break] + PAYMENT_DAYS_RIGHT + rest[insert_at:]
+    )
+
+    make_property_setter(
+        "Salary Slip", None, "field_order", json.dumps(new_order), "Data", for_doctype=True
+    )
+    frappe.clear_cache(doctype="Salary Slip")
+    print("Payment Days layout updated.")
 
 
 def setup_settings():
@@ -189,7 +285,7 @@ def update_structure_formulas():
                     "depends_on_payment_days": 0,
                     "do_not_include_in_total": c["do_not_include_in_total"],
                 })
-                new_row.idx = 0
+                new_row.idx = len(ss.get(table))
                 new_row.db_insert()
 
 

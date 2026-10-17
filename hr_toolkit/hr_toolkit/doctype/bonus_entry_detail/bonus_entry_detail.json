@@ -1,0 +1,43 @@
+{
+ "actions": [],
+ "creation": "2026-10-17 20:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "employee",
+  "employee_name",
+  "department",
+  "date_of_joining",
+  "service_months",
+  "column_break_1",
+  "monthly_salary",
+  "bonus_percent",
+  "calculated_amount",
+  "bonus_amount",
+  "eligibility"
+ ],
+ "fields": [
+  {"fieldname": "employee", "fieldtype": "Link", "label": "Employee", "options": "Employee", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "employee_name", "fieldtype": "Data", "label": "Employee Name", "fetch_from": "employee.employee_name", "read_only": 1, "in_list_view": 1},
+  {"fieldname": "department", "fieldtype": "Link", "label": "Department", "options": "Department", "read_only": 1},
+  {"fieldname": "date_of_joining", "fieldtype": "Date", "label": "Date of Joining", "read_only": 1},
+  {"fieldname": "service_months", "fieldtype": "Int", "label": "Service Months", "read_only": 1, "in_list_view": 1},
+  {"fieldname": "column_break_1", "fieldtype": "Column Break"},
+  {"fieldname": "monthly_salary", "fieldtype": "Currency", "label": "Monthly Salary", "read_only": 1, "in_list_view": 1},
+  {"fieldname": "bonus_percent", "fieldtype": "Percent", "label": "Bonus %", "read_only": 1},
+  {"fieldname": "calculated_amount", "fieldtype": "Currency", "label": "Calculated Amount", "read_only": 1},
+  {"fieldname": "bonus_amount", "fieldtype": "Currency", "label": "Bonus Amount", "reqd": 1, "in_list_view": 1, "bold": 1},
+  {"fieldname": "eligibility", "fieldtype": "Data", "label": "Eligibility", "read_only": 1}
+ ],
+ "istable": 1,
+ "modified": "2026-10-17 20:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HR Toolkit",
+ "name": "Bonus Entry Detail",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

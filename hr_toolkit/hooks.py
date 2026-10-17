@@ -253,6 +253,12 @@ after_install = "hr_toolkit.install.after_install"
 after_migrate = "hr_toolkit.install.after_migrate"
 
 doc_events = {
+    "Attendance": {
+        "validate": "hr_toolkit.payroll.attendance.set_overtime_from_checkins",
+    },
+    "Shift Type": {
+        "validate": "hr_toolkit.payroll.shift.set_shift_type_hours",
+    },
     "Salary Slip": {
         "before_validate": "hr_toolkit.payroll.salary_slip.calculate_deduction_days",
         "validate": "hr_toolkit.payroll.salary_slip.set_fixed_payment_days",

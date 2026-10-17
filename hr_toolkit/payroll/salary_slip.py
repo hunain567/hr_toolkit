@@ -1,7 +1,18 @@
 import frappe
-from frappe.utils import add_days, cint, date_diff, flt, getdate, nowdate
+from frappe import _
+from frappe.utils import add_days, add_months, cint, date_diff, flt, formatdate, getdate, nowdate
+
+from hr_toolkit.payroll.shift import find_assignment, get_shift_assignments, get_shift_types
 
 FIXED_DIVISORS = {"26-Day Basis": 26, "30-Day Basis": 30}
+
+# Overtime Policy "Applicable On" -> Employee field
+POLICY_EMPLOYEE_FIELD = {
+    "Department": "department",
+    "Designation": "designation",
+    "Employee Grade": "grade",
+    "Employee": "name",
+}
 
 
 def get_settings():
@@ -21,7 +32,53 @@ def get_settings():
         count_half_day=cint(s.get("count_half_day")),
         half_day_value=flt(s.get("half_day_value")) or 0.5,
         proration_basis=s.get("proration_basis") or "Working Days",
+        enable_overtime=cint(s.get("enable_overtime")),
     )
+
+
+def get_overtime_policy(s, employee, base):
+    """Return (policy, reason). Day Type is reserved: Working Day policies are checked first."""
+    if not s.enable_overtime:
+        return None, "Overtime disabled"
+
+    policies = frappe.get_all(
+        "Overtime Policy",
+        filters={"company": employee.company, "enabled": 1},
+        fields=["name", "applicable_on", "day_type", "rate_multiplier", "min_salary", "max_salary"],
+        order_by="modified desc",
+    )
+    policies.sort(key=lambda p: 0 if p.day_type == "Working Day" else 1)
+
+    for p in policies:
+        value = employee.get(POLICY_EMPLOYEE_FIELD.get(p.applicable_on))
+        if not value:
+            continue
+        if not frappe.db.exists(
+            "Overtime Policy Item", {"parent": p.name, "parenttype": "Overtime Policy", "reference_name": value}
+        ):
+            continue
+        if flt(p.min_salary) and base < flt(p.min_salary):
+            return None, f"Not eligible (salary below minimum, {p.name})"
+        if flt(p.max_salary) and base > flt(p.max_salary):
+            return None, f"Not eligible (salary above maximum, {p.name})"
+        return p, f"Eligible ({p.name})"
+
+    return None, "Not eligible (no matching Overtime Policy)"
+
+
+def get_submitted_overtime(employee, start, end):
+    """{date: [rows]} from submitted Overtime Entry."""
+    out = {}
+    for r in frappe.db.sql(
+        """select e.overtime_date, d.overtime_hours, d.shift
+           from `tabOvertime Entry Detail` d
+           inner join `tabOvertime Entry` e on e.name = d.parent
+           where e.docstatus = 1 and d.employee = %s and e.overtime_date between %s and %s""",
+        (employee, start, end),
+        as_dict=True,
+    ):
+        out.setdefault(getdate(r.overtime_date), []).append(r)
+    return out
 
 
 def get_base_salary(employee, salary_structure, end_date):
@@ -79,6 +136,12 @@ def get_cutoff(doc, s, end):
     return getdate(nowdate())
 
 
+def is_full_month_period(start, end):
+    """True when the slip covers a complete monthly payroll period
+    (e.g. 1 Sep - 30 Sep, or 26 Sep - 25 Oct)."""
+    return end >= getdate(add_days(add_months(start, 1), -1))
+
+
 def nearest_working_day(day, step, start, end, off_days):
     x = getdate(add_days(day, step))
     while start <= x <= end:
@@ -89,7 +152,7 @@ def nearest_working_day(day, step, start, end, off_days):
 
 
 def calculate_deduction_days(doc, method=None):
-    """before_validate: calculate earned basic and all day counts as per HR Toolkit Settings.
+    """before_validate: calculate earned basic, overtime and all day counts as per HR Toolkit Settings.
     (Function name kept for the existing hook.)"""
     if not (doc.employee and doc.start_date and doc.end_date):
         return
@@ -98,15 +161,27 @@ def calculate_deduction_days(doc, method=None):
     start, end = getdate(doc.start_date), getdate(doc.end_date)
     cutoff = get_cutoff(doc, s, end)
 
-    joining, relieving = frappe.db.get_value(
-        "Employee", doc.employee, ["date_of_joining", "relieving_date"]
+    employee = frappe.db.get_value(
+        "Employee",
+        doc.employee,
+        ["name", "company", "date_of_joining", "relieving_date", "default_shift",
+         "department", "designation", "grade"],
+        as_dict=True,
     )
-    joining = getdate(joining) if joining else None
-    relieving = getdate(relieving) if relieving else None
+    joining = getdate(employee.date_of_joining) if employee.date_of_joining else None
+    relieving = getdate(employee.relieving_date) if employee.relieving_date else None
+    default_shift = employee.default_shift
+
+    base = get_base_salary(doc.employee, doc.salary_structure, end)
+    policy, ot_reason = get_overtime_policy(s, employee, base)
 
     weekly, holidays = get_off_days(doc.employee, start, end, s.weekly_off_day)
     off_days = weekly | holidays
     lwp_types = set(frappe.get_all("Leave Type", filters={"is_lwp": 1}, pluck="name"))
+
+    overtime = get_submitted_overtime(doc.employee, start, end) if s.enable_overtime else {}
+    shift_types = get_shift_types() if policy and overtime else {}
+    assignments = get_shift_assignments(doc.employee, start, end) if policy and overtime else []
 
     attendance = {}
     for r in frappe.get_all(
@@ -116,17 +191,18 @@ def calculate_deduction_days(doc, method=None):
             "docstatus": 1,
             "attendance_date": ["between", [start, end]],
         },
-        fields=["attendance_date", "status", "leave_type"],
+        fields=["attendance_date", "status", "leave_type", "shift"],
     ):
         attendance[getdate(r.attendance_date)] = r
 
     c = frappe._dict(
         present=0, paid_leave=0, absent=0, unmarked=0, lwp=0, half=0,
         weekly_off=0, holiday=0, sandwich=0, outside=0, future=0,
-        service=0, scheduled=0,
+        service=0, scheduled=0, overtime_hours=0, overtime_units=0,
     )
     chargeable_dates = set()
     counted_weekly_offs = []
+    missing_shift = []
 
     day = start
     while day <= end:
@@ -143,6 +219,21 @@ def calculate_deduction_days(doc, method=None):
             c.service += 1
             att = attendance.get(day)
             status = att.status if att else None
+
+            # Overtime from submitted Overtime Entry, using the Shift Type of this day
+            for ot in overtime.get(day, []):
+                hours = flt(ot.overtime_hours)
+                if hours <= 0:
+                    continue
+                c.overtime_hours += hours
+                if policy:
+                    shift = ot.shift or (att.shift if att else None) or find_assignment(day, assignments) or default_shift
+                    st = shift_types.get(shift)
+                    if not st or st.hours <= 0:
+                        missing_shift.append(day)
+                    else:
+                        multiplier = st.multiplier if st.multiplier > 0 else flt(policy.rate_multiplier) or 1
+                        c.overtime_units += hours * multiplier / st.hours
 
             if is_off:
                 if status == "Absent" and not s.exclude_holidays:
@@ -175,6 +266,15 @@ def calculate_deduction_days(doc, method=None):
 
         day = getdate(add_days(day, 1))
 
+    if missing_shift:
+        frappe.throw(
+            _("Overtime cannot be calculated for {0}: no Shift found on {1}. "
+              "Please set a Default Shift on the Employee, a Shift Assignment, or a Shift on the Overtime Entry.").format(
+                doc.employee, ", ".join(formatdate(d) for d in missing_shift)
+            ),
+            title=_("Shift Not Found"),
+        )
+
     # Sandwich rule: weekly off between two chargeable working days
     if s.sandwich_rule:
         for wo in counted_weekly_offs:
@@ -182,8 +282,6 @@ def calculate_deduction_days(doc, method=None):
             next_day = nearest_working_day(wo, 1, start, end, off_days)
             if prev_day in chargeable_dates and next_day in chargeable_dates:
                 c.sandwich += 1
-
-    base = get_base_salary(doc.employee, doc.salary_structure, end)
 
     if s.method in FIXED_DIVISORS:
         divisor = FIXED_DIVISORS[s.method]
@@ -195,7 +293,10 @@ def calculate_deduction_days(doc, method=None):
     rate = base / divisor if divisor else 0
     half_value = s.half_day_value if s.count_half_day else 0
     chargeable = c.absent + c.unmarked + c.lwp + c.half * half_value + c.sandwich
-    full_period = c.outside == 0 and c.future == 0
+
+    # Full period only when the slip covers a complete month, the employee was
+    # in service for all of it and no day falls after the attendance cut-off.
+    full_period = is_full_month_period(start, end) and c.outside == 0 and c.future == 0
 
     if s.method == "Fixed Monthly Salary":
         chargeable = 0
@@ -220,12 +321,23 @@ def calculate_deduction_days(doc, method=None):
     earned = base - rate * chargeable if full_period else rate * payable
     earned = flt(min(max(earned, 0), base), s.precision)
 
+    # Overtime amount = Daily Rate x sum(OT hours x multiplier / shift hours)
+    overtime_amount = flt(rate * c.overtime_units, s.precision) if policy else 0
+    if not shift_types and default_shift:
+        shift_types = get_shift_types()
+    default_st = shift_types.get(default_shift)
+    default_hours = default_st.hours if default_st and default_st.hours > 0 else 0
+
     doc.hrt_calculation_method = s.method
     doc.hrt_base_salary = base
     doc.fixed_working_days = divisor
     doc.hrt_daily_rate = flt(rate, 2)
     doc.hrt_full_period = 1 if full_period else 0
     doc.hrt_earned_basic = earned
+    doc.hrt_hourly_rate = flt(rate / default_hours, 2) if default_hours else 0
+    doc.hrt_overtime_hours = flt(c.overtime_hours, 2)
+    doc.hrt_overtime_amount = overtime_amount
+    doc.hrt_overtime_eligibility = ot_reason
     doc.hrt_payable_days = flt(payable, 2)
     doc.deduct_days = flt(chargeable, 2)
     doc.hrt_present_days = c.present
