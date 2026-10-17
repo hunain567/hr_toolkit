@@ -253,6 +253,10 @@ after_install = "hr_toolkit.install.after_install"
 after_migrate = "hr_toolkit.install.after_migrate"
 
 doc_events = {
+    "Salary Structure Assignment": {
+        "on_submit": "hr_toolkit.payroll.employee_salary.update_employee_salary",
+        "on_cancel": "hr_toolkit.payroll.employee_salary.update_employee_salary",
+    },
     "Attendance": {
         "validate": "hr_toolkit.payroll.attendance.set_overtime_from_checkins",
     },

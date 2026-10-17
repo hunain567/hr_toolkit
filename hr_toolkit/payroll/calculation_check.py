@@ -476,6 +476,7 @@ def run(company=None, structure=STRUCTURE):
         _entry_amount_cases(ctx, results)
         _bonus_cases(ctx, results)
         _checkin_tool_cases(ctx, results)
+        _salary_revision_cases(ctx, results)
     except Exception:
         error = frappe.get_traceback()
     finally:
@@ -626,3 +627,41 @@ def _checkin_tool_cases(ctx, r):
     res = save_month_checkins(ctx.emp, [row], 0)
     _check(r, "T20d Cleared OUT time deletes the checkin", slip, 1, actual=res["deleted"])
     _clear(ctx)
+
+
+def _salary_revision_cases(ctx, r):
+    _reset()
+    _clear(ctx)
+    _emp(ctx, date_of_joining="2026-01-01", relieving_date=None)
+    slip = _calc(ctx, *SEP)
+
+    rev = frappe.get_doc({
+        "doctype": "Salary Revision", "naming_series": "HR-SREV-.YYYY.-",
+        "company": ctx.company, "effective_date": "2026-10-01",
+        "increment_type": "Percentage", "increment_value": 10,
+        "employees": [{"employee": ctx.emp, "new_salary": 1}],
+    })
+    rev.apply_increment = rev.apply_increment  # whitelisted method also works in code
+    rev.validate()  # fills current salary
+    _check(r, "T21a Current Salary fetched", slip, BASE, actual=rev.employees[0].current_salary)
+    rev.apply_increment()
+    _check(r, "T21b Apply 10% to all: 55,000", slip, 55000, actual=rev.employees[0].new_salary)
+
+    rev.insert(ignore_permissions=True)
+    rev.submit()
+    base = frappe.db.get_value("Salary Structure Assignment", rev.employees[0].salary_structure_assignment, "base")
+    _check(r, "T21c Submit creates assignment with 55,000", slip, 55000, actual=base)
+    _check(r, "T21d Employee Salary updated to 55,000", slip, 55000,
+           actual=frappe.db.get_value("Employee", ctx.emp, "hrt_salary"))
+
+    rev.cancel()
+    _check(r, "T21e Cancel restores Employee Salary 50,000", slip, BASE,
+           actual=frappe.db.get_value("Employee", ctx.emp, "hrt_salary"))
+
+    dup = frappe.get_doc({
+        "doctype": "Salary Revision", "naming_series": "HR-SREV-.YYYY.-",
+        "company": ctx.company, "effective_date": "2026-10-01",
+        "employees": [{"employee": ctx.emp, "new_salary": 55000}, {"employee": ctx.emp, "new_salary": 56000}],
+    })
+    _check(r, "T21f Same employee twice in one document is blocked", slip, 1,
+           actual=_blocked(lambda: dup.insert(ignore_permissions=True)))

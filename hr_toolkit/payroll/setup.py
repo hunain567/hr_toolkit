@@ -92,6 +92,18 @@ CUSTOM_FIELDS = {
         _ro("hrt_outside_days", "Days Outside Employment", "Float", "hrt_holiday_days"),
         _ro("hrt_future_days", "Days After Cut-off", "Float", "hrt_outside_days"),
     ],
+    "Employee": [
+        {
+            "fieldname": "hrt_salary",
+            "label": "Salary",
+            "fieldtype": "Currency",
+            "options": "salary_currency",
+            "insert_after": "ctc",
+            "read_only": 1,
+            "bold": 1,
+            "description": "Monthly salary from the current Salary Structure Assignment.",
+        },
+    ],
     "Attendance": [
         {
             "fieldname": "overtime_hours",
@@ -148,6 +160,7 @@ def setup_custom_fields():
     for doctype in CUSTOM_FIELDS:
         frappe.db.updatedb(doctype)
     setup_payment_days_layout()
+    setup_property_setters()
 
 
 def setup_payment_days_layout():
@@ -336,3 +349,11 @@ def run(company=None):
         create_salary_structure(company)
     frappe.db.commit()
     print("HR Toolkit payroll setup completed.")
+
+
+def setup_property_setters():
+    """Hide Cost to Company (CTC) on Employee; Salary comes from Salary Structure Assignment."""
+    from frappe.custom.doctype.property_setter.property_setter import make_property_setter
+
+    make_property_setter("Employee", "ctc", "hidden", 1, "Check")
+    frappe.clear_cache(doctype="Employee")
