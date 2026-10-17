@@ -8,7 +8,7 @@ overtime policies, overtime entries, checkins, attendance), checks every scenari
 then rolls everything back. Nothing is saved.
 """
 import frappe
-from frappe.utils import add_days, flt, getdate
+from frappe.utils import add_days, flt, get_datetime, getdate
 
 from hr_toolkit.payroll.salary_slip import calculate_deduction_days
 
@@ -475,6 +475,7 @@ def run(company=None, structure=STRUCTURE):
         _rounding_cases(ctx, results)
         _entry_amount_cases(ctx, results)
         _bonus_cases(ctx, results)
+        _checkin_tool_cases(ctx, results)
     except Exception:
         error = frappe.get_traceback()
     finally:
@@ -535,7 +536,7 @@ def _entry_amount_cases(ctx, r):
     _check(r, "T18b Overtime Entry: Hourly Rate 50,000/26/8", slip, RATE26 / 8, actual=row.hourly_rate)
     _check(r, "T18c Overtime Entry: Amount 2 h single", slip, RATE26 / 8 * 2, actual=row.overtime_amount)
 
-    _policy(ctx, "Department", ["HRT Test Office"])
+    _remove_policies()
     entry.save()
     _check(r, "T18d Not eligible employee: Amount 0", slip, 0, actual=entry.employees[0].overtime_amount)
     _clear(ctx)
@@ -589,3 +590,39 @@ def _bonus_cases(ctx, r):
            actual=_blocked(lambda: dup.insert(ignore_permissions=True)))
 
     _emp(ctx, date_of_joining="2026-01-01")
+
+
+def _checkin_tool_cases(ctx, r):
+    from hr_toolkit.hr_toolkit.doctype.checkin_adjustment_tool.checkin_adjustment_tool import (
+        get_month_checkins,
+        save_month_checkins,
+    )
+
+    _reset()
+    _clear(ctx)
+    _emp(ctx, default_shift=ctx.morning)
+    slip = _calc(ctx, *SEP)
+
+    # Only IN at 07:58 on 30 Sep -> Missing OUT
+    _checkin(ctx, "2026-09-30 07:58:00")
+    rows = get_month_checkins(ctx.emp, "2026-09-28", "2026-09-30")
+    row = [d for d in rows if str(d["date"]) == "2026-09-30"][0]
+    _check(r, "T20a Month view shows Missing OUT", slip, 1, actual=1 if "Missing OUT" in row["remarks"] else 0)
+
+    # Correct IN to 08:00 and add OUT 19:05 -> 08:00-19:05 = 11h05 - 1h - 8h = 2h05 -> 2 h
+    row["in_time"] = "08:00:00"
+    row["out_time"] = "19:05:00"
+    res = save_month_checkins(ctx.emp, [row], 1)
+    in_time = frappe.db.get_value("Employee Checkin", row["in_checkin"], "time")
+    _check(r, "T20b Existing IN updated to 08:00", slip, 1,
+           actual=1 if in_time and get_datetime(in_time).strftime("%H:%M") == "08:00" else 0)
+    ot = frappe.db.get_value("Attendance", {"employee": ctx.emp, "attendance_date": "2026-09-30", "docstatus": 1}, "overtime_hours")
+    _check(r, "T20c OUT created, Present attendance with 2 h OT", slip, 2, actual=ot or -1)
+
+    # Clear OUT -> deleted
+    rows = get_month_checkins(ctx.emp, "2026-09-30", "2026-09-30")
+    row = rows[0]
+    row["out_time"] = None
+    res = save_month_checkins(ctx.emp, [row], 0)
+    _check(r, "T20d Cleared OUT time deletes the checkin", slip, 1, actual=res["deleted"])
+    _clear(ctx)

@@ -1,0 +1,45 @@
+{
+ "actions": [],
+ "creation": "2026-10-17 21:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "employee",
+  "employee_name",
+  "column_break_main",
+  "from_date",
+  "to_date",
+  "column_break_options",
+  "mark_attendance",
+  "section_days",
+  "days"
+ ],
+ "fields": [
+  {"fieldname": "employee", "fieldtype": "Link", "label": "Employee", "options": "Employee", "reqd": 1},
+  {"fieldname": "employee_name", "fieldtype": "Data", "label": "Employee Name", "fetch_from": "employee.employee_name", "read_only": 1},
+  {"fieldname": "column_break_main", "fieldtype": "Column Break"},
+  {"fieldname": "from_date", "fieldtype": "Date", "label": "From Date", "reqd": 1},
+  {"fieldname": "to_date", "fieldtype": "Date", "label": "To Date", "reqd": 1},
+  {"fieldname": "column_break_options", "fieldtype": "Column Break"},
+  {"fieldname": "mark_attendance", "fieldtype": "Check", "label": "Mark Attendance", "default": "1",
+   "description": "On save, create Present attendance, change Absent to Present, or update In/Out, Working Hours and Overtime. Leave is not changed."},
+  {"fieldname": "section_days", "fieldtype": "Section Break", "label": "Checkins",
+   "description": "Change a time to correct a checkin, enter a time to add a missing checkin, clear a time to delete the checkin. Then click Save Checkins."},
+  {"fieldname": "days", "fieldtype": "Table", "label": "Days", "options": "Checkin Adjustment Detail"}
+ ],
+ "hide_toolbar": 1,
+ "issingle": 1,
+ "modified": "2026-10-17 22:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HR Toolkit",
+ "name": "Checkin Adjustment Tool",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "read": 1, "write": 1, "role": "System Manager"},
+  {"create": 1, "read": 1, "write": 1, "role": "HR Manager"},
+  {"create": 1, "read": 1, "write": 1, "role": "HR User"}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
