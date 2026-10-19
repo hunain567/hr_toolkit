@@ -5,6 +5,7 @@ from frappe.utils import cint, flt, get_datetime, getdate, to_timedelta
 
 from hr_toolkit.payroll.shift import (
     calc_break_minutes,
+    has_time,
     calc_shift_hours,
     find_assignment,
     get_shift_assignments,
@@ -56,7 +57,7 @@ def compute_overtime(employee, day, shift, settings=None):
          "begin_check_in_before_shift_start_time"],
         as_dict=True,
     )
-    if not st or not st.start_time or not st.end_time:
+    if not st or not has_time(st.start_time) or not has_time(st.end_time):
         return None
 
     base = get_datetime(day)

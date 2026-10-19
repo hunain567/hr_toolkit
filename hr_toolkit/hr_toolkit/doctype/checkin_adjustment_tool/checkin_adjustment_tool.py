@@ -6,6 +6,7 @@ from frappe.model.document import Document
 from frappe.utils import add_days, cint, date_diff, get_datetime, getdate, to_timedelta
 
 from hr_toolkit.payroll.attendance import set_overtime_from_checkins
+from hr_toolkit.payroll.shift import has_time
 from hr_toolkit.payroll.salary_slip import get_off_days, get_settings
 
 ROLES = ["System Manager", "HR Manager", "HR User"]
@@ -18,14 +19,14 @@ class CheckinAdjustmentTool(Document):
 
 
 def _time_str(value):
-    td = to_timedelta(value) if value else None
+    td = to_timedelta(value) if has_time(value) else None
     return (datetime.min + td).strftime("%H:%M") if td is not None else None
 
 
 def _day_window(day, st):
     """Shift start, shift end and the 24 hour checkin window for the day (whole day when no shift)."""
     base = get_datetime(day)
-    if not st or not st.start_time or not st.end_time:
+    if not st or not has_time(st.start_time) or not has_time(st.end_time):
         return None, None, base, base + timedelta(hours=24) - timedelta(seconds=1)
     start = base + to_timedelta(st.start_time)
     end = base + to_timedelta(st.end_time)
@@ -226,7 +227,7 @@ def save_month_checkins(employee, rows, mark_attendance=1):
             out_dt = None
             if row.out_time:
                 out_dt = base + _parse_hm(row.out_time)
-                reference = in_dt or (base + to_timedelta(st.start_time) if st and st.start_time else None)
+                reference = in_dt or (base + to_timedelta(st.start_time) if st and has_time(st.start_time) else None)
                 if reference and out_dt <= reference:
                     out_dt += timedelta(days=1)  # night shift checkout after midnight
 
